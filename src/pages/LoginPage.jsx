@@ -44,10 +44,10 @@ export default function LoginPage() {
         <div className="login-page">
             <div className="card login-card">
                 <div className="brand" style={{ marginBottom: '1rem' }}>
-                    <div className="brand-mark">Z1</div>
+                    <div className="brand-mark">HB</div>
                     <div className="brand-text">
                         <span className="brand-name">HeyBadminton</span>
-                        <span className="brand-subtitle">CLB Cầu lông Z1</span>
+                        <span className="brand-subtitle">CLB Cầu lông HeyBadminton</span>
                     </div>
                 </div>
 

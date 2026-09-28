@@ -3,6 +3,33 @@ import { authApi, userApi } from '../api';
 
 const AuthContext = createContext(null);
 
+export function getUserRoles(user) {
+    if (!user) return [];
+    const roles = Array.isArray(user.roles) ? user.roles : [];
+
+    return roles.flatMap((role) => {
+        if (typeof role === 'string') return [role];
+        if (role && typeof role === 'object') {
+            if (role.name) return [role.name];
+            if (role.roleName) return [role.roleName];
+        }
+        return [];
+    });
+}
+
+export function hasRole(user, targetRole) {
+    if (!user || !targetRole) return false;
+    return getUserRoles(user).some((role) => String(role).toUpperCase() === String(targetRole).toUpperCase());
+}
+
+export function isAdminUser(user) {
+    if (!user) return false;
+    return getUserRoles(user).some((role) => {
+        const normalized = String(role).toUpperCase();
+        return normalized === 'ADMIN' || normalized === 'ROLE_ADMIN' || normalized.includes('ADMIN');
+    });
+}
+
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [token, setToken] = useState(localStorage.getItem('hb_token') || '');

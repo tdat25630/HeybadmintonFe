@@ -1,6 +1,6 @@
 import Modal from './Modal';
 
-export default function ConfirmDialog({ open, title, message, confirmLabel = 'Xóa', cancelLabel = 'Hủy', onConfirm, onCancel, loading = false }) {
+export default function ConfirmDialog({ open, title, message, confirmLabel = 'Xóa', cancelLabel = 'Hủy', onConfirm, onCancel, loading = false, children }) {
     return (
         <Modal
             open={open}
@@ -18,6 +18,7 @@ export default function ConfirmDialog({ open, title, message, confirmLabel = 'X�
             }
         >
             <p style={{ margin: 0, color: '#d9e5f7' }}>{message}</p>
+            {children}
         </Modal>
     );
 }

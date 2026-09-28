@@ -1,5 +1,5 @@
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { AuthProvider, isAdminUser, useAuth } from './context/AuthContext';
 import AppLayout from './layouts/AppLayout';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
@@ -8,6 +8,7 @@ import SessionsPage from './pages/SessionsPage';
 import MembersPage from './pages/MembersPage';
 import ProfilePage from './pages/ProfilePage';
 import RolesPage from './pages/RolesPage';
+import AdminDashboardPage from './pages/AdminDashboardPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 function ProtectedRoute({ children }) {
@@ -30,6 +31,24 @@ function PublicRoute({ children }) {
     return !isAuthenticated ? children : <Navigate to="/dashboard" replace />;
 }
 
+function AdminRoute({ children }) {
+    const { user, loading } = useAuth();
+
+    if (loading) {
+        return <div className="page-shell loading-shell">Đang tải quyền truy cập...</div>;
+    }
+
+    if (!user) {
+        return <Navigate to="/login" replace />;
+    }
+
+    if (!isAdminUser(user)) {
+        return <Navigate to="/dashboard" replace />;
+    }
+
+    return children;
+}
+
 function AppRoutes() {
     return (
         <Routes>
@@ -46,9 +65,7 @@ function AppRoutes() {
                 path="/"
                 element={
                     <ProtectedRoute>
-                        <AppLayout>
-                            <Outlet />
-                        </AppLayout>
+                        <AppLayout />
                     </ProtectedRoute>
                 }
             >
@@ -61,6 +78,24 @@ function AppRoutes() {
                 <Route path="roles" element={<RolesPage />} />
                 <Route path="permissions" element={<RolesPage />} />
                 <Route path="settings/access-control" element={<RolesPage />} />
+                <Route path="*" element={<NotFoundPage />} />
+            </Route>
+
+            <Route
+                path="/admin"
+                element={
+                    <ProtectedRoute>
+                        <AdminRoute>
+                            <AppLayout />
+                        </AdminRoute>
+                    </ProtectedRoute>
+                }
+            >
+                <Route index element={<AdminDashboardPage />} />
+                <Route path="sessions" element={<SessionsPage />} />
+                <Route path="users" element={<MembersPage />} />
+                <Route path="roles" element={<RolesPage />} />
+                <Route path="permissions" element={<RolesPage />} />
                 <Route path="*" element={<NotFoundPage />} />
             </Route>
 

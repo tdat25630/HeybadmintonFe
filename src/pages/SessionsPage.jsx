@@ -4,11 +4,14 @@ import Modal from '../components/Modal';
 import Pagination from '../components/Pagination';
 import SearchInput from '../components/SearchInput';
 import { participantApi, sessionApi, userApi } from '../api';
+import { isAdminUser, useAuth } from '../context/AuthContext';
 
 const defaultMemberForm = { userId: '', sessionId: '', guestName: '', guestGender: true, guestLevel: '' };
 const defaultGuestForm = { sessionId: '', guestName: '', guestGender: true, guestLevel: '' };
 
 export default function SessionsPage() {
+    const { user } = useAuth();
+    const isAdmin = isAdminUser(user);
     const [sessions, setSessions] = useState([]);
     const [page, setPage] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
@@ -151,30 +154,34 @@ export default function SessionsPage() {
                 <p>Quản lý lịch tập và điểm danh thành viên.</p>
             </div>
 
-            <div className="card" style={{ padding: '1rem', marginTop: '1rem' }}>
-                <form onSubmit={handleCreateSession}>
-                    <div className="field">
-                        <label htmlFor="description">Mô tả buổi</label>
-                        <input id="description" value={sessionForm.description} onChange={(e) => setSessionForm({ description: e.target.value })} placeholder="Ví dụ: Sinh hoạt CLB" />
-                    </div>
+            {isAdmin ? (
+                <div className="card" style={{ padding: '1rem', marginTop: '1rem' }}>
+                    <form onSubmit={handleCreateSession}>
+                        <div className="field">
+                            <label htmlFor="description">Mô tả buổi</label>
+                            <input id="description" value={sessionForm.description} onChange={(e) => setSessionForm({ description: e.target.value })} placeholder="Ví dụ: Sinh hoạt CLB" />
+                        </div>
 
-                    {sessionError ? <div className="error-state mt-2" style={{ minHeight: '3rem', padding: '0.75rem' }}>{sessionError}</div> : null}
-                    {sessionSuccess ? <div className="info-banner mt-2">{sessionSuccess}</div> : null}
+                        {sessionError ? <div className="error-state mt-2" style={{ minHeight: '3rem', padding: '0.75rem' }}>{sessionError}</div> : null}
+                        {sessionSuccess ? <div className="info-banner mt-2">{sessionSuccess}</div> : null}
 
-                    <div className="form-actions">
-                        <button type="button" className="secondary-button" onClick={() => { setSessionForm({ description: '' }); setSessionError(''); setSessionSuccess(''); }}>Hủy</button>
-                        <button type="submit" className="primary-button" disabled={creatingSession}>{creatingSession ? 'Đang tạo...' : 'Tạo buổi'}</button>
-                    </div>
-                </form>
-            </div>
+                        <div className="form-actions">
+                            <button type="button" className="secondary-button" onClick={() => { setSessionForm({ description: '' }); setSessionError(''); setSessionSuccess(''); }}>Hủy</button>
+                            <button type="submit" className="primary-button" disabled={creatingSession}>{creatingSession ? 'Đang tạo...' : 'Tạo buổi'}</button>
+                        </div>
+                    </form>
+                </div>
+            ) : null}
 
             <div className="card" style={{ marginTop: '1.25rem', padding: '1rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
                     <h3 style={{ margin: 0 }}>Danh sách buổi</h3>
-                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                        <button type="button" className="primary-button" onClick={() => setMemberOpen(true)}>+ Thêm thành viên</button>
-                        <button type="button" className="secondary-button" onClick={() => setGuestOpen(true)}>+ Thêm vãng lai</button>
-                    </div>
+                    {isAdmin ? (
+                        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                            <button type="button" className="primary-button" onClick={() => setMemberOpen(true)}>+ Thêm thành viên</button>
+                            <button type="button" className="secondary-button" onClick={() => setGuestOpen(true)}>+ Thêm vãng lai</button>
+                        </div>
+                    ) : null}
                 </div>
 
                 {loading ? <div className="empty-state" style={{ minHeight: '160px' }}>Đang tải buổi sinh hoạt...</div> : null}

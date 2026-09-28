@@ -13,4 +13,10 @@ export const participantApi = {
         const response = await apiClient.post('/sessionParticipants/addGuess', payload);
         return unwrapApiResponse(response);
     },
+    deleteParticipant: async (sessionId, participantId) => {
+        const response = await apiClient.delete('/sessionParticipants', {
+            params: { sessionId, participantId },
+        });
+        return unwrapApiResponse(response);
+    },
 };

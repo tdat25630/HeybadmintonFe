@@ -1,18 +1,25 @@
-import { LogOut, LayoutDashboard, CalendarDays, Users, ShieldCheck, UserCircle2 } from 'lucide-react';
+import { LogOut, LayoutDashboard, CalendarDays, Users, ShieldCheck, UserCircle2, Settings2 } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { isAdminUser, useAuth } from '../context/AuthContext';
 
-const navItems = [
+const userNavItems = [
     { to: '/dashboard', label: 'Tổng quan', icon: LayoutDashboard },
     { to: '/attendance', label: 'Điểm danh', icon: CalendarDays },
     { to: '/sessions', label: 'Buổi sinh hoạt', icon: CalendarDays },
-    { to: '/members', label: 'Thành viên', icon: Users },
-    { to: '/roles', label: 'Vai trò', icon: ShieldCheck },
     { to: '/profile', label: 'Hồ sơ', icon: UserCircle2 },
+];
+
+const adminNavItems = [
+    { to: '/admin', label: 'Tổng quan', icon: LayoutDashboard },
+    { to: '/admin/sessions', label: 'Buổi sinh hoạt', icon: CalendarDays },
+    { to: '/admin/users', label: 'Thành viên', icon: Users },
+    { to: '/admin/roles', label: 'Vai trò', icon: ShieldCheck },
+    { to: '/admin/permissions', label: 'Quyền', icon: Settings2 },
 ];
 
 export default function AppLayout() {
     const { user, logout } = useAuth();
+    const isAdmin = isAdminUser(user);
 
     const handleLogout = async () => {
         await logout();
@@ -22,9 +29,9 @@ export default function AppLayout() {
         <div className="app-shell">
             <header className="topbar">
                 <div className="brand">
-                    <div className="brand-mark">Z1</div>
+                    <div className="brand-mark">HB</div>
                     <div className="brand-text">
-                        <span className="brand-name">CLB Cầu lông Z1</span>
+                        <span className="brand-name">HeyBadminton</span>
                         <span className="brand-subtitle">Quản lý quỹ &amp; hoạt động CLB</span>
                     </div>
                 </div>
@@ -51,12 +58,26 @@ export default function AppLayout() {
             <div className="layout">
                 <aside className="sidebar">
                     <nav className="nav-list" aria-label="Sidebar navigation">
-                        {navItems.map(({ to, label, icon: Icon }) => (
+                        {userNavItems.map(({ to, label, icon: Icon }) => (
                             <NavLink key={to} to={to} end={to === '/dashboard'} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                                 <Icon size={18} />
                                 <span className="nav-text">{label}</span>
                             </NavLink>
                         ))}
+
+                        {isAdmin ? (
+                            <>
+                                <div style={{ marginTop: '1rem', padding: '0.8rem 0.9rem 0.4rem', color: '#7ea4c6', fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                                    Quản trị
+                                </div>
+                                {adminNavItems.map(({ to, label, icon: Icon }) => (
+                                    <NavLink key={to} to={to} end={to === '/admin'} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                                        <Icon size={18} />
+                                        <span className="nav-text">{label}</span>
+                                    </NavLink>
+                                ))}
+                            </>
+                        ) : null}
                     </nav>
                 </aside>
 
