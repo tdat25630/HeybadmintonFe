@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CalendarDays, ChevronDown, ChevronUp, Users, MapPin, Trash2 } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { participantApi, sessionApi } from '../api';
+import { useAuth } from '../context/AuthContext';
 
 const genderMap = {
     true: 'Nam',
@@ -9,6 +10,7 @@ const genderMap = {
 };
 
 export default function AttendancePage() {
+    const { user } = useAuth();
     const [sessions, setSessions] = useState([]);
     const [expanded, setExpanded] = useState({});
     const [participantsBySession, setParticipantsBySession] = useState({});
@@ -17,6 +19,11 @@ export default function AttendancePage() {
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [deleting, setDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState('');
+    const [joinedSessions, setJoinedSessions] = useState({});
+    const [joiningSessionId, setJoiningSessionId] = useState(null);
+    const [participationError, setParticipationError] = useState('');
+    const [participationSuccess, setParticipationSuccess] = useState('');
+    const joiningSessionsRef = useRef(new Set());
 
     const getParticipantId = (item) => item?.participantId ?? item?.id ?? null;
 
@@ -40,9 +47,84 @@ export default function AttendancePage() {
             const response = await participantApi.getParticipants(sessionId, 0, 100);
             const items = response?.items || [];
             setParticipantsBySession((prev) => ({ ...prev, [sessionId]: items }));
+            if (user?.id && items.some((item) => String(item.userId) === String(user.id))) {
+                setJoinedSessions((prev) => ({ ...prev, [sessionId]: true }));
+            }
         } catch (err) {
             setParticipantsBySession((prev) => ({ ...prev, [sessionId]: [] }));
             console.error(err);
+        }
+    };
+
+    const handleParticipate = async (session) => {
+        const { sessionId } = session;
+        if (session.status !== true) {
+            setParticipationError('Buổi sinh hoạt đã kết thúc hoặc hiện không khả dụng.');
+            setParticipationSuccess('');
+            return;
+        }
+        if (!user?.id || joinedSessions[sessionId] || joiningSessionsRef.current.has(sessionId)) return;
+
+        joiningSessionsRef.current.add(sessionId);
+        setJoiningSessionId(sessionId);
+        setParticipationError('');
+        setParticipationSuccess('');
+
+        try {
+            const latestResponse = await sessionApi.getSessions(0, 20);
+            const latestSession = (latestResponse?.items || []).find((item) => item.sessionId === sessionId);
+            if (latestSession) {
+                setSessions((prev) => prev.map((item) => item.sessionId === sessionId ? latestSession : item));
+            }
+            if (latestSession?.status !== true) {
+                setParticipationError('Buổi sinh hoạt đã kết thúc hoặc hiện không khả dụng.');
+                return;
+            }
+
+            const existingResponse = await participantApi.getParticipants(sessionId, 0, 100);
+            const existingParticipants = existingResponse?.items || [];
+            if (existingParticipants.some((item) => String(item.userId) === String(user.id))) {
+                setJoinedSessions((prev) => ({ ...prev, [sessionId]: true }));
+                setParticipantsBySession((prev) => ({ ...prev, [sessionId]: existingParticipants }));
+                setParticipationSuccess('Bạn đã tham gia buổi sinh hoạt này.');
+                return;
+            }
+
+            await participantApi.addMember({
+                sessionId,
+                userId: user.id,
+                guestName: '',
+                guestGender: false,
+                guestLevel: '',
+            });
+            setJoinedSessions((prev) => ({ ...prev, [sessionId]: true }));
+            setParticipationSuccess('Bạn đã tham gia buổi sinh hoạt.');
+            await loadParticipants(sessionId);
+        } catch {
+            let ended = false;
+            try {
+                const latestResponse = await sessionApi.getSessions(0, 20);
+                const latestSession = (latestResponse?.items || []).find((item) => item.sessionId === sessionId);
+                if (latestSession) {
+                    setSessions((prev) => prev.map((item) => item.sessionId === sessionId ? latestSession : item));
+                    ended = latestSession.status !== true;
+                }
+
+                const participantResponse = await participantApi.getParticipants(sessionId, 0, 100);
+                const participants = participantResponse?.items || [];
+                if (participants.some((item) => String(item.userId) === String(user.id))) {
+                    setJoinedSessions((prev) => ({ ...prev, [sessionId]: true }));
+                    setParticipantsBySession((prev) => ({ ...prev, [sessionId]: participants }));
+                    setParticipationSuccess('Bạn đã tham gia buổi sinh hoạt này.');
+                    return;
+                }
+            } catch {
+                // Keep the generic feedback when the refresh also fails.
+            }
+            setParticipationError(ended ? 'Buổi sinh hoạt đã kết thúc hoặc hiện không khả dụng.' : 'Không thể tham gia buổi sinh hoạt. Vui lòng thử lại.');
+        } finally {
+            joiningSessionsRef.current.delete(sessionId);
+            setJoiningSessionId(null);
         }
     };
 
@@ -114,6 +196,8 @@ export default function AttendancePage() {
             <div className="info-banner">
                 Hiện hệ thống đang hiển thị danh sách buổi từ API. Nếu API bổ sung ngày/địa điểm, giao diện có thể mở rộng mà không cần đổi dữ liệu hiện có.
             </div>
+            {participationError ? <div className="error-state mt-2" role="alert" style={{ minHeight: '3rem', padding: '0.75rem' }}>{participationError}</div> : null}
+            {participationSuccess ? <div className="info-banner mt-2" role="status">{participationSuccess}</div> : null}
 
             <div className="collapse-panel">
                 {sessions.length ? (
@@ -137,8 +221,18 @@ export default function AttendancePage() {
                                             <span><MapPin size={14} /> Không có dữ liệu vị trí</span>
                                         </div>
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                        <span className="badge success">Đã đóng</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                                        <span className={`badge ${session.status === true ? 'success' : 'neutral'}`}>
+                                            {session.status === true ? 'Đang mở' : 'Đã kết thúc'}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            className={joinedSessions[session.sessionId] || session.status !== true ? 'secondary-button' : 'primary-button'}
+                                            onClick={() => handleParticipate(session)}
+                                            disabled={session.status !== true || joinedSessions[session.sessionId] || joiningSessionId === session.sessionId}
+                                        >
+                                            {session.status !== true ? 'Ended' : joinedSessions[session.sessionId] ? 'Participating' : joiningSessionId === session.sessionId ? 'Joining...' : 'Participate'}
+                                        </button>
                                         <button type="button" className="icon-button" onClick={() => toggleSession(session.sessionId)} aria-label="Mở rộng buổi">
                                             {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                                         </button>

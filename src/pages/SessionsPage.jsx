@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
 import Modal from '../components/Modal';
 import Pagination from '../components/Pagination';
@@ -30,18 +30,41 @@ export default function SessionsPage() {
     const [guestForm, setGuestForm] = useState(defaultGuestForm);
     const [memberLoading, setMemberLoading] = useState(false);
     const [guestLoading, setGuestLoading] = useState(false);
+    const [joinedSessions, setJoinedSessions] = useState({});
+    const [checkingParticipation, setCheckingParticipation] = useState(false);
+    const [joiningSessionId, setJoiningSessionId] = useState(null);
+    const [participationError, setParticipationError] = useState('');
+    const [participationSuccess, setParticipationSuccess] = useState('');
+    const joiningSessionsRef = useRef(new Set());
 
     const loadSessions = async (nextPage = page) => {
         try {
             setLoading(true);
             const response = await sessionApi.getSessions(nextPage, 10);
-            setSessions(response?.items || []);
+            const nextSessions = response?.items || [];
+            setSessions(nextSessions);
             setPage(response?.page ?? nextPage);
             setTotalPages(response?.totalPages ?? 1);
             setTotalElements(response?.totalElements ?? 0);
+
+            if (user?.id && nextSessions.length) {
+                setCheckingParticipation(true);
+                const participationResults = await Promise.all(nextSessions.map(async (session) => {
+                    try {
+                        const participantResponse = await participantApi.getParticipants(session.sessionId, 0, 100);
+                        const participants = participantResponse?.items || [];
+                        return [session.sessionId, participants.some((participant) => String(participant.userId) === String(user.id))];
+                    } catch {
+                        return [session.sessionId, false];
+                    }
+                }));
+                setJoinedSessions((prev) => ({ ...prev, ...Object.fromEntries(participationResults) }));
+                setCheckingParticipation(false);
+            }
         } catch (err) {
             setError(err?.message || 'Không thể tải buổi sinh hoạt.');
         } finally {
+            setCheckingParticipation(false);
             setLoading(false);
         }
     };
@@ -57,9 +80,71 @@ export default function SessionsPage() {
         }
     };
 
+    const refreshSessionStatus = async (sessionId) => {
+        const response = await sessionApi.getSessions(page, 10);
+        const latestSession = (response?.items || []).find((item) => item.sessionId === sessionId);
+        if (latestSession) {
+            setSessions((prev) => prev.map((item) => item.sessionId === sessionId ? latestSession : item));
+        }
+        return latestSession?.status === true;
+    };
+
     useEffect(() => {
         loadSessions();
     }, []);
+
+    const handleParticipate = async (session) => {
+        const { sessionId } = session;
+        if (session.status !== true) {
+            setParticipationError('Buổi sinh hoạt đã kết thúc hoặc hiện không khả dụng.');
+            setParticipationSuccess('');
+            return;
+        }
+        if (!user?.id || joinedSessions[sessionId] || joiningSessionsRef.current.has(sessionId)) return;
+
+        joiningSessionsRef.current.add(sessionId);
+        setJoiningSessionId(sessionId);
+        setParticipationError('');
+        setParticipationSuccess('');
+
+        try {
+            if (!(await refreshSessionStatus(sessionId))) {
+                setParticipationError('Buổi sinh hoạt đã kết thúc hoặc hiện không khả dụng.');
+                return;
+            }
+
+            await participantApi.addMember({
+                sessionId,
+                userId: user.id,
+                guestName: '',
+                guestGender: false,
+                guestLevel: '',
+            });
+            setJoinedSessions((prev) => ({ ...prev, [sessionId]: true }));
+            setParticipationSuccess('Bạn đã tham gia buổi sinh hoạt.');
+        } catch {
+            try {
+                if (!(await refreshSessionStatus(sessionId))) {
+                    setParticipationError('Buổi sinh hoạt đã kết thúc hoặc hiện không khả dụng.');
+                    return;
+                }
+
+                const participantResponse = await participantApi.getParticipants(sessionId, 0, 100);
+                const participants = participantResponse?.items || [];
+                if (participants.some((participant) => String(participant.userId) === String(user.id))) {
+                    setJoinedSessions((prev) => ({ ...prev, [sessionId]: true }));
+                    setParticipationSuccess('Bạn đã tham gia buổi sinh hoạt.');
+                    return;
+                }
+            } catch {
+                // Keep the generic participation error if a status or membership refresh fails.
+            }
+            setParticipationError('Không thể tham gia buổi sinh hoạt. Vui lòng thử lại.');
+        } finally {
+            joiningSessionsRef.current.delete(sessionId);
+            setJoiningSessionId(null);
+        }
+    };
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -100,7 +185,12 @@ export default function SessionsPage() {
         }
 
         setMemberLoading(true);
+        setSessionError('');
         try {
+            if (!(await refreshSessionStatus(memberForm.sessionId))) {
+                setSessionError('Không thể thêm thành viên vì buổi sinh hoạt đã kết thúc hoặc không khả dụng.');
+                return;
+            }
             await participantApi.addMember({
                 sessionId: memberForm.sessionId,
                 userId: memberForm.userId,
@@ -127,7 +217,12 @@ export default function SessionsPage() {
         }
 
         setGuestLoading(true);
+        setSessionError('');
         try {
+            if (!(await refreshSessionStatus(guestForm.sessionId))) {
+                setSessionError('Không thể thêm khách vì buổi sinh hoạt đã kết thúc hoặc không khả dụng.');
+                return;
+            }
             await participantApi.addGuest({
                 sessionId: guestForm.sessionId,
                 guestName: guestForm.guestName.trim(),
@@ -145,7 +240,7 @@ export default function SessionsPage() {
         }
     };
 
-    const sessionOptions = useMemo(() => sessions, [sessions]);
+    const sessionOptions = useMemo(() => sessions.filter((session) => session.status === true), [sessions]);
 
     return (
         <div className="page-shell">
@@ -186,6 +281,8 @@ export default function SessionsPage() {
 
                 {loading ? <div className="empty-state" style={{ minHeight: '160px' }}>Đang tải buổi sinh hoạt...</div> : null}
                 {!loading && !sessions.length ? <div className="empty-state" style={{ minHeight: '160px' }}>Chưa có buổi sinh hoạt nào.</div> : null}
+                {participationError ? <div className="error-state mt-2" role="alert" style={{ minHeight: '3rem', padding: '0.75rem' }}>{participationError}</div> : null}
+                {participationSuccess ? <div className="info-banner mt-2" role="status">{participationSuccess}</div> : null}
 
                 {!loading && sessions.length ? (
                     <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -198,7 +295,19 @@ export default function SessionsPage() {
                                             <span>{session.sessionId}</span>
                                         </div>
                                     </div>
-                                    <span className="badge success">Đã tạo</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                                        <span className={`badge ${session.status === true ? 'success' : 'neutral'}`}>
+                                            {session.status === true ? 'Đang mở' : 'Đã kết thúc'}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            className={joinedSessions[session.sessionId] || session.status !== true ? 'secondary-button' : 'primary-button'}
+                                            onClick={() => handleParticipate(session)}
+                                            disabled={session.status !== true || checkingParticipation || joinedSessions[session.sessionId] || joiningSessionId === session.sessionId}
+                                        >
+                                            {session.status !== true ? 'Ended' : joinedSessions[session.sessionId] ? 'Participating' : joiningSessionId === session.sessionId ? 'Joining...' : 'Participate'}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         ))}
