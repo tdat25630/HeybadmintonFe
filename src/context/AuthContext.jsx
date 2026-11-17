@@ -44,7 +44,7 @@ export function AuthProvider({ children }) {
             }
 
             try {
-                const userInfo = await userApi.getMyInfo();
+                const userInfo = await userApi.getMyInfo(currentToken);
                 setUser(userInfo);
             } catch {
                 localStorage.removeItem('hb_token');
@@ -85,7 +85,7 @@ export function AuthProvider({ children }) {
 
         setToken(signedToken);
 
-        const myInfo = await userApi.getMyInfo();
+        const myInfo = await userApi.getMyInfo(signedToken);
         setUser(myInfo);
         return myInfo;
     };
@@ -109,7 +109,8 @@ export function AuthProvider({ children }) {
 
     const refreshUser = async () => {
         try {
-            const response = await userApi.getMyInfo();
+            const currentToken = token || localStorage.getItem('hb_token') || '';
+            const response = await userApi.getMyInfo(currentToken);
             setUser(response);
             return response;
         } catch (error) {

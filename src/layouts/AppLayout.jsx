@@ -1,9 +1,8 @@
 import { LogOut, LayoutDashboard, CalendarDays, Users, ShieldCheck, UserCircle2, Settings2 } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { isAdminUser, useAuth } from '../context/AuthContext';
+import { getUserRoles, isAdminUser, useAuth } from '../context/AuthContext';
 
 const userNavItems = [
-    { to: '/dashboard', label: 'Tổng quan', icon: LayoutDashboard },
     { to: '/attendance', label: 'Điểm danh', icon: CalendarDays },
     { to: '/sessions', label: 'Buổi sinh hoạt', icon: CalendarDays },
     { to: '/profile', label: 'Hồ sơ', icon: UserCircle2 },
@@ -20,6 +19,8 @@ const adminNavItems = [
 export default function AppLayout() {
     const { user, logout } = useAuth();
     const isAdmin = isAdminUser(user);
+    const userName = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim() || user?.username || 'Người dùng';
+    const userRole = getUserRoles(user)[0] || 'Thành viên';
 
     const handleLogout = async () => {
         await logout();
@@ -42,10 +43,10 @@ export default function AppLayout() {
                     </button>
 
                     <div className="inline-user">
-                        <div className="avatar">{user?.firstName?.[0]?.toUpperCase() || 'U'}</div>
+                        <div className="avatar">{userName[0]?.toUpperCase() || 'U'}</div>
                         <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }} className="meta">
-                            <strong>{user?.firstName || 'Người dùng'} {user?.lastName || ''}</strong>
-                            <span style={{ color: '#9fb2c9', fontSize: '0.75rem' }}>{user?.roles?.[0]?.name || 'Thành viên'}</span>
+                            <strong>{userName}</strong>
+                            <span style={{ color: '#9fb2c9', fontSize: '0.75rem' }}>{userRole}</span>
                         </div>
                     </div>
 

@@ -6,7 +6,7 @@ export const sessionApi = {
         return unwrapApiResponse(response);
     },
     createSession: async (description) => {
-        const response = await apiClient.post('/bsession', { description });
+        const response = await apiClient.post('/bsession', { description, status: true });
         return unwrapApiResponse(response);
     },
 };

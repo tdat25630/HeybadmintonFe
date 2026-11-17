@@ -43,7 +43,7 @@ const refreshAccessToken = async () => {
 apiClient.interceptors.request.use((config) => {
     const token = getStoredToken();
 
-    if (token) {
+    if (token && !config.headers.Authorization) {
         config.headers.Authorization = `Bearer ${token}`;
     }
 

@@ -5,8 +5,10 @@ export const userApi = {
         const response = await apiClient.get('/users', { params: { page, size } });
         return unwrapApiResponse(response);
     },
-    getMyInfo: async () => {
-        const response = await apiClient.get('/users/myInfo');
+    getMyInfo: async (token) => {
+        const response = await apiClient.get('/users/myInfo', token
+            ? { headers: { Authorization: `Bearer ${token}` } }
+            : undefined);
         return unwrapApiResponse(response);
     },
     searchUsername: async (keyword, page = 0, size = 10) => {

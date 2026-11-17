@@ -254,7 +254,7 @@ export default function SessionsPage() {
                     <form onSubmit={handleCreateSession}>
                         <div className="field">
                             <label htmlFor="description">Mô tả buổi</label>
-                            <input id="description" value={sessionForm.description} onChange={(e) => setSessionForm({ description: e.target.value })} placeholder="Ví dụ: Sinh hoạt CLB" />
+                            <input id="description" value={sessionForm.description} onChange={(e) => setSessionForm({ description: e.target.value })} placeholder="Ví dụ: Sinh hoạt CLB" required />
                         </div>
 
                         {sessionError ? <div className="error-state mt-2" style={{ minHeight: '3rem', padding: '0.75rem' }}>{sessionError}</div> : null}
